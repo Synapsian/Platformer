@@ -128,7 +128,7 @@ class Player {
     this.y = y
     this.speed = 5
     this.velocity = [0,0]
-    this.coyoteTime = false
+    this.jumpDebounce = 0
     
     this.size = 50
     
@@ -144,9 +144,23 @@ class Player {
   }
   tick() {
     this.move()
+    this.checkGrounded()
     this.applyGravity()
     this.applyVelocity()
     this.render()
+  }
+  checkGrounded() {
+    if (this.getCollisions(this.x,this.y + 1).length > 0 && this.jumpDebounce <= 0) 
+      {
+        // 6 frames of coyote time
+        this.setState('grounded',6)
+      } 
+    else {
+      if (this.state.type == 'grounded') {
+        this.state.duration -= 1
+        if (this.state.duration <= 0) {this.state.type = 'air'}
+      }
+    }
   }
   die() {
     this.x = 0
@@ -162,24 +176,6 @@ class Player {
       this.state.duration = 0
     }
   }
-  _verticalCollisions(collided) {
-    if (collided) {
-      if (this.velocity[1] > 0) {
-        this.setState('grounded',10)
-      }
-      this.velocity[1] = 0
-    } else {
-      if (this.state.type == 'grounded') {
-        this.state.duration -= 1
-        
-        if (this.state.duration <= 0) {
-          this.state.type = 'air'
-        }
-      } else {
-        this.state.type = 'air'
-      }
-    }
-  }
   applyVelocity() {
     // todo: fix gliding when between two close objects 
     
@@ -188,7 +184,9 @@ class Player {
     const collisionsXY = this.getCollisions(this.x + this.velocity[0],this.y + this.velocity[1])
     const collidedXY = (collisionsXY.length > 0)
     
-    this._verticalCollisions(collidedY)
+    if (collidedY) {
+      this.velocity[1] = 0
+    }
     
     if (collidedX) {
       this.velocity[0] = 0
@@ -220,22 +218,26 @@ class Player {
     
   }
   move() {
+    if (this.jumpDebounce > 0) {
+      this.jumpDebounce -= 1
+    }
+    
     if (keyIsDown(87) || keyIsDown(38)) {
       if (this.state.type == 'grounded') {
         this.state.duration = 0
+        this.state.type = 'air'
+        this.jumpDebounce = 5
         this.applyForce(0,-15) 
       }
     } // W
-    if (keyIsDown(65) || keyIsDown(37)) { this.velocity[0] = -this.speed } // A
-    else if (keyIsDown(68) || keyIsDown(39)) { this.velocity[0] = this.speed } // D
+    if (keyIsDown(65) || keyIsDown(37)) {this.velocity[0] = -this.speed} // A
+    else if (keyIsDown(68) || keyIsDown(39)) {this.velocity[0] = this.speed} // D
     else { this.velocity[0] = 0 }
   }
   applyGravity() {
-    if (this.y >= height) {
-      return
+    if (this.state.type != 'grounded') {
+      this.applyForce(0,Gravity)
     }
-    
-    this.applyForce(0,Gravity)
   }
   applyForce(x,y) {
     this.velocity[0] += x
